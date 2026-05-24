@@ -1,0 +1,481 @@
+{
+  "info": {
+    "name": "🎓 AI Academic API",
+    "_postman_id": "ai-academic-collection-v1",
+    "description": "📚 Complete API collection for the AI Academic system.\n\n**Base URL:** `{{base_url}}`\n\n**Authentication:** Bearer Token (Sanctum)\n- Login first to get a token\n- Set the token in the collection variable `token`\n\n---\n### 🔐 Roles\n- **Admin** — full system access\n- **Student** — access to own data only",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://127.0.0.1:8000/api",
+      "type": "string"
+    },
+    {
+      "key": "token",
+      "value": "",
+      "type": "string",
+      "description": "Bearer token — set after login"
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "🔐 Auth",
+      "description": "Authentication endpoints — login, logout, and current user info.",
+      "item": [
+        {
+          "name": "🚪 Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData.success === true && jsonData.data && jsonData.data.access_token) {",
+                  "    pm.collectionVariables.set(\"token\", jsonData.data.access_token);",
+                  "    console.log(\"✅ Token saved:\", jsonData.data.access_token);",
+                  "} else {",
+                  "    console.log(\"❌ Login failed or token not found\");",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"STU001\",\n  \"password\": \"password\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "login"]
+            },
+            "description": "Login with student/admin code and password.\n\n✅ **Auto-saves the token** — the post-response script automatically sets the `token` collection variable after a successful login."
+          }
+        },
+        {
+          "name": "🚪 Logout",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/logout",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "logout"]
+            },
+            "description": "Revokes the current access token."
+          }
+        },
+        {
+          "name": "👤 Me (current user)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/me",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "me"]
+            },
+            "description": "Returns the currently authenticated user's profile."
+          }
+        }
+      ]
+    },
+    {
+      "name": "🛠️ Admin",
+      "description": "Admin-only endpoints. Requires `role = admin`.",
+      "item": [
+        {
+          "name": "📊 Overview & Dashboard",
+          "item": [
+            {
+              "name": "📊 Get Overview",
+              "request": {
+                "method": "GET",
+                "header": [
+                  { "key": "Accept", "value": "application/json" }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/admin/overview",
+                  "host": ["{{base_url}}"],
+                  "path": ["admin", "overview"]
+                },
+                "description": "Returns a high-level dashboard snapshot:\n- 👥 Total students & breakdown by level\n- 📚 Total courses\n- 📋 Enrollment stats (passed / in-progress)\n- 📝 Material request stats (pending / approved / rejected × regular / graduation)\n- 🕐 Last 10 pending requests"
+              }
+            }
+          ]
+        },
+        {
+          "name": "👥 Students Management",
+          "item": [
+            {
+              "name": "👥 List Students",
+              "request": {
+                "method": "GET",
+                "header": [
+                  { "key": "Accept", "value": "application/json" }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/admin/students?search=&level=&per_page=10&page=1",
+                  "host": ["{{base_url}}"],
+                  "path": ["admin", "students"],
+                  "query": [
+                    { "key": "search", "value": "", "description": "Search by name, code, or national ID" },
+                    { "key": "level", "value": "", "description": "Filter by level (1, 2, 3, 4)" },
+                    { "key": "per_page", "value": "10", "description": "Items per page (default: 10)" },
+                    { "key": "page", "value": "1", "description": "Page number" }
+                  ]
+                },
+                "description": "Returns a paginated list of all students.\n\n**Filters:**\n- `search` — name, code, or national ID\n- `level` — academic level\n- `per_page` — pagination size"
+              }
+            },
+            {
+              "name": "🔍 Get Student by ID",
+              "request": {
+                "method": "GET",
+                "header": [
+                  { "key": "Accept", "value": "application/json" }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/admin/students/1",
+                  "host": ["{{base_url}}"],
+                  "path": ["admin", "students", "1"]
+                },
+                "description": "Returns a single student's full profile by their ID."
+              }
+            }
+          ]
+        },
+        {
+          "name": "📝 Material Requests (All)",
+          "item": [
+            {
+              "name": "📋 List All Requests",
+              "request": {
+                "method": "GET",
+                "header": [
+                  { "key": "Accept", "value": "application/json" }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/admin/material-requests?status=&type=&student_id=&per_page=10",
+                  "host": ["{{base_url}}"],
+                  "path": ["admin", "material-requests"],
+                  "query": [
+                    { "key": "status", "value": "", "description": "pending | approved | rejected" },
+                    { "key": "type", "value": "", "description": "regular | graduation" },
+                    { "key": "student_id", "value": "", "description": "Filter by specific student ID" },
+                    { "key": "per_page", "value": "10", "description": "Items per page" }
+                  ]
+                },
+                "description": "Returns ALL material requests (both regular and graduation) with optional filters.\n\n**Filters:**\n- `status` — pending | approved | rejected\n- `type` — regular | graduation\n- `student_id` — filter by student\n- `per_page` — pagination"
+              }
+            },
+            {
+              "name": "✅ Approve Requests",
+              "request": {
+                "method": "POST",
+                "header": [
+                  { "key": "Accept", "value": "application/json" },
+                  { "key": "Content-Type", "value": "application/json" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"ids\": [1, 2, 3]\n}",
+                  "options": { "raw": { "language": "json" } }
+                },
+                "url": {
+                  "raw": "{{base_url}}/admin/material-requests/approve",
+                  "host": ["{{base_url}}"],
+                  "path": ["admin", "material-requests", "approve"]
+                },
+                "description": "Approves one or more **pending** material requests (any type).\n\n**Body:**\n```json\n{\n  \"ids\": [1, 2, 3]\n}\n```\n\n> ⚠️ Only `pending` requests will be updated — already approved/rejected ones are skipped."
+              }
+            },
+            {
+              "name": "❌ Reject Requests",
+              "request": {
+                "method": "POST",
+                "header": [
+                  { "key": "Accept", "value": "application/json" },
+                  { "key": "Content-Type", "value": "application/json" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"ids\": [1, 2, 3],\n  \"adviser_notes\": \"Student does not meet the prerequisites for these courses.\"\n}",
+                  "options": { "raw": { "language": "json" } }
+                },
+                "url": {
+                  "raw": "{{base_url}}/admin/material-requests/reject",
+                  "host": ["{{base_url}}"],
+                  "path": ["admin", "material-requests", "reject"]
+                },
+                "description": "Rejects one or more **pending** material requests (any type).\n\n**Body:**\n```json\n{\n  \"ids\": [1, 2, 3],\n  \"adviser_notes\": \"Reason for rejection\" // required\n}\n```\n\n> ⚠️ `adviser_notes` is **required** on rejection."
+              }
+            }
+          ]
+        },
+        {
+          "name": "📄 Regular Requests",
+          "item": [
+            {
+              "name": "📄 List Regular Requests",
+              "request": {
+                "method": "GET",
+                "header": [
+                  { "key": "Accept", "value": "application/json" }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/admin/regular-requests?status=&student_id=&per_page=10",
+                  "host": ["{{base_url}}"],
+                  "path": ["admin", "regular-requests"],
+                  "query": [
+                    { "key": "status", "value": "", "description": "pending | approved | rejected" },
+                    { "key": "student_id", "value": "", "description": "Filter by student ID" },
+                    { "key": "per_page", "value": "10", "description": "Items per page" }
+                  ]
+                },
+                "description": "Returns only **regular** material registration requests.\n\n**Filters:**\n- `status` — pending | approved | rejected\n- `student_id` — filter by student\n- `per_page` — pagination"
+              }
+            }
+          ]
+        },
+        {
+          "name": "🎓 Graduation Requests",
+          "item": [
+            {
+              "name": "🎓 List Graduation Requests",
+              "request": {
+                "method": "GET",
+                "header": [
+                  { "key": "Accept", "value": "application/json" }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/admin/graduation-requests?status=&student_id=&per_page=10",
+                  "host": ["{{base_url}}"],
+                  "path": ["admin", "graduation-requests"],
+                  "query": [
+                    { "key": "status", "value": "", "description": "pending | approved | rejected" },
+                    { "key": "student_id", "value": "", "description": "Filter by student ID" },
+                    { "key": "per_page", "value": "10", "description": "Items per page" }
+                  ]
+                },
+                "description": "Returns only **graduation** material requests (extra courses needed for graduation).\n\n**Filters:**\n- `status` — pending | approved | rejected\n- `student_id` — filter by student\n- `per_page` — pagination"
+              }
+            }
+          ]
+        },
+        {
+          "name": "⚙️ Setup",
+          "item": [
+            {
+              "name": "📁 List Setup Files",
+              "request": {
+                "method": "GET",
+                "header": [
+                  { "key": "Accept", "value": "application/json" }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/admin/setup/files",
+                  "host": ["{{base_url}}"],
+                  "path": ["admin", "setup", "files"]
+                },
+                "description": "Returns a list of all previously imported setup files."
+              }
+            },
+            {
+              "name": "📤 Import Setup File",
+              "request": {
+                "method": "POST",
+                "header": [
+                  { "key": "Accept", "value": "application/json" }
+                ],
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "student_formula",
+                      "type": "file",
+                      "description": "Student data file — Excel or CSV (.xlsx, .xls, .csv)"
+                    },
+                    {
+                      "key": "collage_list",
+                      "type": "file",
+                      "description": "College list file — PDF only (.pdf)"
+                    }
+                  ]
+                },
+                "url": {
+                  "raw": "{{base_url}}/admin/setup/import",
+                  "host": ["{{base_url}}"],
+                  "path": ["admin", "setup", "import"]
+                },
+                "description": "Imports setup files into the system.\n\n**Form Data:**\n- `student_formula` *(required)* — Excel/CSV file containing student data (`.xlsx`, `.xls`, `.csv`)\n- `collage_list` *(required)* — College course list as a PDF file (`.pdf`)"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "🎓 Student",
+      "description": "Student-only endpoints. Requires authentication — data is scoped to the logged-in student only.",
+      "item": [
+        {
+          "name": "📝 My Material Requests",
+          "item": [
+            {
+              "name": "📋 Get My Requests",
+              "request": {
+                "method": "GET",
+                "header": [
+                  { "key": "Accept", "value": "application/json" }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/student/material-requests?status=&type=&per_page=10",
+                  "host": ["{{base_url}}"],
+                  "path": ["student", "material-requests"],
+                  "query": [
+                    { "key": "status", "value": "", "description": "pending | approved | rejected" },
+                    { "key": "type", "value": "", "description": "regular | graduation" },
+                    { "key": "per_page", "value": "10", "description": "Items per page" }
+                  ]
+                },
+                "description": "Returns the logged-in student's own material requests.\n\n**Filters:**\n- `status` — `pending` | `approved` | `rejected`\n- `type` — `regular` | `graduation`\n- `per_page` — pagination\n\n> 💡 Use `status=rejected` to see which requests were rejected and why (check `adviser_notes`)."
+              }
+            },
+            {
+              "name": "📄 Submit Regular Request",
+              "request": {
+                "method": "POST",
+                "header": [
+                  { "key": "Accept", "value": "application/json" },
+                  { "key": "Content-Type", "value": "application/json" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"courses\": [1, 2, 3]\n}",
+                  "options": { "raw": { "language": "json" } }
+                },
+                "url": {
+                  "raw": "{{base_url}}/student/material-requests/regular",
+                  "host": ["{{base_url}}"],
+                  "path": ["student", "material-requests", "regular"]
+                },
+                "description": "Submit a regular (standard) course registration request for one or more courses.\n\n**Body:**\n```json\n{\n  \"courses\": [1, 2, 3]  // array of course IDs\n}\n```\n\n> ⚠️ Courses with an existing `pending` or `approved` request will be **skipped** (returned in `skipped_course_ids`)."
+              }
+            },
+            {
+              "name": "🎓 Submit Graduation Request",
+              "request": {
+                "method": "POST",
+                "header": [
+                  { "key": "Accept", "value": "application/json" },
+                  { "key": "Content-Type", "value": "application/json" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"courses\": [4, 5],\n  \"student_notes\": \"I need these additional courses to fulfil my graduation requirements.\"\n}",
+                  "options": { "raw": { "language": "json" } }
+                },
+                "url": {
+                  "raw": "{{base_url}}/student/material-requests/graduation",
+                  "host": ["{{base_url}}"],
+                  "path": ["student", "material-requests", "graduation"]
+                },
+                "description": "Submit a graduation request for extra courses beyond the standard plan.\n\n**Body:**\n```json\n{\n  \"courses\": [4, 5],          // array of course IDs\n  \"student_notes\": \"...\"      // required — reason/justification\n}\n```\n\n> ⚠️ `student_notes` is **required**.\n> ⚠️ Courses with an existing `pending` or `approved` graduation request will be **skipped**."
+              }
+            }
+          ]
+        },
+        {
+          "name": "📚 My Courses",
+          "item": [
+            {
+              "name": "📚 All My Courses (Summary)",
+              "request": {
+                "method": "GET",
+                "header": [
+                  { "key": "Accept", "value": "application/json" }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/student/courses",
+                  "host": ["{{base_url}}"],
+                  "path": ["student", "courses"]
+                },
+                "description": "Returns a full summary of the student's course status grouped into three categories:\n\n- ✅ `completed` — passed courses\n- 🔄 `in_progress` — currently enrolled (not yet passed)\n- 📭 `remaining` — not enrolled at all\n\nAlso includes a `summary` object with counts."
+              }
+            },
+            {
+              "name": "✅ Completed Courses",
+              "request": {
+                "method": "GET",
+                "header": [
+                  { "key": "Accept", "value": "application/json" }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/student/courses/completed",
+                  "host": ["{{base_url}}"],
+                  "path": ["student", "courses", "completed"]
+                },
+                "description": "Returns all courses the student has successfully passed (`is_passed = true`)."
+              }
+            },
+            {
+              "name": "🔄 Enrolled (In-Progress) Courses",
+              "request": {
+                "method": "GET",
+                "header": [
+                  { "key": "Accept", "value": "application/json" }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/student/courses/enrolled",
+                  "host": ["{{base_url}}"],
+                  "path": ["student", "courses", "enrolled"]
+                },
+                "description": "Returns courses the student is currently registered in but has **not yet passed** (`is_passed = false`)."
+              }
+            },
+            {
+              "name": "📭 Remaining Courses",
+              "request": {
+                "method": "GET",
+                "header": [
+                  { "key": "Accept", "value": "application/json" }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/student/courses/remaining",
+                  "host": ["{{base_url}}"],
+                  "path": ["student", "courses", "remaining"]
+                },
+                "description": "Returns all courses the student has **never enrolled in** — neither passed nor currently registered.\n\nUseful for showing what courses are still available to register."
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
