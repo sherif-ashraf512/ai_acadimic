@@ -34,6 +34,8 @@ Route::middleware(['auth:sanctum'])->group(function () {
 
         // Setup
         Route::post('setup/import', [SetupFilesController::class, 'import']);
+        Route::post('setup/process', [SetupFilesController::class, 'process']);
+        Route::get('setup/status', [SetupFilesController::class, 'status']);
         Route::get('setup/files', [SetupFilesController::class, 'index']);
 
         // Students management

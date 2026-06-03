@@ -2,6 +2,7 @@
 
 namespace App\Imports;
 
+use App\Jobs\ProcessSetupFilesJob;
 use App\Models\User;
 use Illuminate\Support\Collection;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -10,10 +11,33 @@ use Log;
 use Maatwebsite\Excel\Concerns\ToCollection;
 use Maatwebsite\Excel\Concerns\WithChunkReading;
 use Maatwebsite\Excel\Concerns\Importable;
+use Maatwebsite\Excel\Concerns\WithEvents;
+use Maatwebsite\Excel\Events\AfterImport;
 
-class StudentsImport implements ToCollection, WithChunkReading, ShouldQueue
+class StudentsImport implements ToCollection, WithChunkReading, WithEvents, ShouldQueue
 {
     use Importable;
+
+    /**
+     * @param int $setupFileId  Passed so AfterImport can dispatch the Gemini job
+     *                          only after ALL chunks have finished.
+     */
+    public function __construct(private readonly int $setupFileId) {}
+
+    // ── Events ────────────────────────────────────────────────────────────────
+
+    public function registerEvents(): array
+    {
+        return [
+            // Fired once after every chunk job completes — i.e. the whole import is done.
+            AfterImport::class => function (AfterImport $event) {
+                ProcessSetupFilesJob::dispatch($this->setupFileId);
+                Log::info('StudentsImport: all chunks done — ProcessSetupFilesJob dispatched', [
+                    'setup_id' => $this->setupFileId,
+                ]);
+            },
+        ];
+    }
 
     public function collection(Collection $rows)
     {

@@ -332,7 +332,37 @@
                   "host": ["{{base_url}}"],
                   "path": ["admin", "setup", "import"]
                 },
-                "description": "Imports setup files into the system.\n\n**Form Data:**\n- `student_formula` *(required)* — Excel/CSV file containing student data (`.xlsx`, `.xls`, `.csv`)\n- `collage_list` *(required)* — College course list as a PDF file (`.pdf`)"
+                "description": "Upload the college catalog PDF and the student transcript XLSX.\n\nFiles are saved to disk and **AI processing is queued automatically**.\n\n**Form Data:**\n- `collage_list` *(required)* — College course list PDF (`.pdf`)\n- `student_formula` *(required)* — Student transcripts Excel file (`.xlsx`, `.xls`)\n\n**Response includes:**\n- File URLs\n- `processing_status: pending` — job is queued\n\n> 💡 Poll `GET /admin/setup/status` to track extraction progress."
+              }
+            },
+            {
+              "name": "🤖 Re-trigger AI Processing",
+              "request": {
+                "method": "POST",
+                "header": [
+                  { "key": "Accept", "value": "application/json" }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/admin/setup/process",
+                  "host": ["{{base_url}}"],
+                  "path": ["admin", "setup", "process"]
+                },
+                "description": "Manually re-trigger AI extraction for already-uploaded files.\n\nUseful when:\n- The previous job **failed** (`processing_status: failed`)\n- You want a **fresh extraction** after fixing the files\n\n> ⚠️ Returns `409 Conflict` if processing is already running."
+              }
+            },
+            {
+              "name": "📡 Processing Status",
+              "request": {
+                "method": "GET",
+                "header": [
+                  { "key": "Accept", "value": "application/json" }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/admin/setup/status",
+                  "host": ["{{base_url}}"],
+                  "path": ["admin", "setup", "status"]
+                },
+                "description": "Lightweight polling endpoint to check the AI processing status.\n\n**`processing_status` values:**\n- `pending` — queued, not started yet\n- `processing` — Gemini is currently extracting data\n- `completed` — all courses and student records are persisted ✅\n- `failed` — job failed; `processing_error` contains the reason ❌\n\n**On `completed`:** also returns `courses_count` — total courses in the DB."
               }
             }
           ]

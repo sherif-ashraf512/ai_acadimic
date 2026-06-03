@@ -29,7 +29,9 @@ class MaterialRequestController extends Controller
         $skipped = [];
 
         foreach ($request->courses as $courseId) {
-            // Prevent duplicate pending/approved requests for same course
+            $course = Course::find($courseId);
+
+            // 1. Prevent duplicate pending/approved requests for same course
             $exists = MaterialRequest::where('student_id', $student->id)
                 ->where('course_id', $courseId)
                 ->where('type', 'regular')
@@ -37,8 +39,46 @@ class MaterialRequestController extends Controller
                 ->exists();
 
             if ($exists) {
-                $skipped[] = $courseId;
+                $skipped[] = [
+                    'course_id' => $courseId,
+                    'reason'    => 'You already have a pending or approved request for this course.',
+                ];
                 continue;
+            }
+
+            // 2. Check if student already passed this course
+            $alreadyPassed = \App\Models\StudentCourses::where('student_id', $student->id)
+                ->where('course_id', $courseId)
+                ->where('is_passed', true)
+                ->exists();
+
+            if ($alreadyPassed) {
+                $skipped[] = [
+                    'course_id' => $courseId,
+                    'reason'    => 'You have already passed this course.',
+                ];
+                continue;
+            }
+
+            // 3. Check prerequisite
+            if (!empty($course->prerequisite)) {
+                $prereqCode = trim($course->prerequisite);
+                $prereqCourse = Course::where('code', $prereqCode)->first();
+                
+                if ($prereqCourse) {
+                    $passedPrereq = \App\Models\StudentCourses::where('student_id', $student->id)
+                        ->where('course_id', $prereqCourse->id)
+                        ->where('is_passed', true)
+                        ->exists();
+
+                    if (!$passedPrereq) {
+                        $skipped[] = [
+                            'course_id' => $courseId,
+                            'reason'    => "You must pass the prerequisite course ({$prereqCourse->name}) first.",
+                        ];
+                        continue;
+                    }
+                }
             }
 
             $created[] = MaterialRequest::create([
@@ -56,11 +96,10 @@ class MaterialRequestController extends Controller
         ];
 
         if (!empty($skipped)) {
-            $data['skipped_course_ids'] = $skipped;
-            $data['skip_reason'] = 'A pending or approved regular request already exists for these courses.';
+            $data['skipped_courses'] = $skipped;
         }
 
-        return $this->created($data, 'Regular material requests submitted successfully.');
+        return $this->created($data, 'Regular material requests processed.');
     }
 
     // ══════════════════════════════════════════════════════

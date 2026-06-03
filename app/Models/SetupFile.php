@@ -9,21 +9,24 @@ class SetupFile extends Model
     protected $fillable = [
         'collage_list',
         'student_formula',
+        'processing_status',
+        'processing_error',
+        'processed_at',
     ];
 
-    public function getCollageListAttribute($value)
+    protected $casts = [
+        'processed_at' => 'datetime',
+    ];
+
+    // ── Accessors ──────────────────────────────────────────────────────────────
+
+    public function getCollageListAttribute($value): ?string
     {
-        if($value){
-            return asset("storage/$value");
-        }
-        return null;
+        return $value ? asset("storage/{$value}") : null;
     }
 
-    public function getStudentFormulaAttribute($value)
+    public function getStudentFormulaAttribute($value): ?string
     {
-        if($value){
-            return asset("storage/$value");
-        }
-        return null;
+        return $value ? asset("storage/{$value}") : null;
     }
 }
