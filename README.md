@@ -1,58 +1,84 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# AI Academic - University Management System
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+A modern, AI-powered academic management system built with **Laravel 12**. The platform leverages the Google Gemini API to automate the extraction of academic data (courses and student transcripts) from raw PDF and Excel files, providing a seamless course registration and tracking experience for both students and administrators.
 
-## About Laravel
+## 🚀 Key Features
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+### 1. AI-Powered Data Extraction (Admin Setup)
+- **PDF Course Parsing**: Upload university bylaws (لائحة) in PDF format. The system reads the PDF (using `smalot/pdfparser`) and sends the text to Gemini AI to extract structured course data: *Course Code, Name, Credit Hours, and Prerequisites*.
+- **Excel Transcript Parsing**: Upload student grades via Excel sheets. The system processes each sheet individually (using `PhpSpreadsheet` in data-only mode to conserve memory), extracting the student's ID and all courses taken along with their pass/fail status.
+- **Smart Arabic Text Handling**: Includes a custom algorithm to detect and automatically reverse "visual-order" Arabic text commonly found in legacy PDFs, ensuring course names are stored correctly in the database.
+- **Resilient AI Pipeline**: The `GeminiService` includes partial JSON recovery for truncated AI responses, automatic retries for rate limits (HTTP 429), and sleep/retry mechanisms for server overloads (HTTP 503). All processing is handled asynchronously via Laravel Queues.
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+### 2. Student Course Registration System
+- **Regular Course Requests**: Students can apply to register for courses for the upcoming semester.
+- **Robust Validations**: The system automatically prevents registration if:
+  - The student already has a pending or approved request for the course.
+  - The student has already passed the course.
+  - The student has not passed the required prerequisite for the course.
+- **Graduation Requests**: Special handling for graduation material requests, allowing students to add custom notes for the academic adviser.
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+### 3. Admin Dashboard & Tracking
+- **Request Management**: Administrators can view, approve, or reject material registration requests, while leaving mandatory notes for rejected requests.
+- **Academic Progress**: Track individual student progress, viewing their completed courses, currently enrolled courses, and remaining credits.
+- **System Overview**: High-level metrics showing the status of AI parsing jobs, total registered students, and pending requests.
 
-## Learning Laravel
+## 🛠️ Tech Stack
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+- **Backend Framework**: Laravel 12 (PHP 8.2+)
+- **Database**: MySQL (utf8mb4 encoding for full Arabic support)
+- **Queue System**: Laravel Queues (Database/Redis) for background AI processing
+- **AI Integration**: Google Gemini API (`gemini-2.0-flash` / `gemini-1.5-flash`)
+- **Document Parsers**: 
+  - `smalot/pdfparser` (PDF extraction)
+  - `phpoffice/phpspreadsheet` (Excel reading)
 
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+## ⚙️ Installation & Setup
 
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
+1. **Clone the repository:**
+   ```bash
+   git clone https://github.com/sherif-ashraf512/ai_acadimic.git
+   cd ai_acadimic
+   ```
 
-## Agentic Development
+2. **Install PHP dependencies:**
+   ```bash
+   composer install
+   ```
 
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
+3. **Environment Setup:**
+   ```bash
+   cp .env.example .env
+   php artisan key:generate
+   ```
+   Update the `.env` file with your database credentials and add your Gemini API Key:
+   ```env
+   GEMINI_API_KEY=your_api_key_here
+   ```
 
-```bash
-composer require laravel/boost --dev
+4. **Run Migrations & Storage Link:**
+   ```bash
+   php artisan migrate
+   php artisan storage:link
+   ```
 
-php artisan boost:install
-```
+5. **Start the Application:**
+   ```bash
+   # Start the local development server
+   php artisan serve
 
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
+   # In a separate terminal window, start the queue worker for AI processing
+   php artisan queue:work
+   ```
 
-## Contributing
+## 🧠 AI Processing Workflow (How it Works)
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+1. The Admin uploads the PDF & Excel files via the Setup Dashboard.
+2. A `ProcessSetupFilesJob` is dispatched to the background queue.
+3. The job extracts text locally to bypass Gemini's binary file token limits.
+4. `GeminiService` formats a strict prompt and sends the text to the API.
+5. The JSON response is parsed (with fallback recovery if truncated), normalized, and saved directly to the database.
+6. The Admin can track the progress of the job in real-time, catching any specific errors per student sheet.
 
-## Code of Conduct
-
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
-
-## Security Vulnerabilities
-
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
-
-## License
-
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+## 📄 License
+This project is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
