@@ -6,6 +6,7 @@ use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\MaterialRequestController;
 use App\Http\Controllers\SetupFilesController;
 use App\Http\Controllers\StudentCoursesController;
+use App\Http\Controllers\StudentRecommendController;
 use App\Http\Controllers\StudentsController;
 use Illuminate\Support\Facades\Route;
 
@@ -48,6 +49,9 @@ Route::middleware(['auth:sanctum'])->group(function () {
         Route::get('graduation-requests', [AdminMaterialRequestController::class, 'graduationRequests']);
         Route::post('material-requests/approve', [AdminMaterialRequestController::class, 'approve']);
         Route::post('material-requests/reject', [AdminMaterialRequestController::class, 'reject']);
+
+        // Advisor API status (admin can check if Python service is ready)
+        Route::get('advisor/status', [StudentRecommendController::class, 'status']);
     });
 
     // ── Student Routes ────────────────────────────────────────
@@ -63,5 +67,9 @@ Route::middleware(['auth:sanctum'])->group(function () {
         Route::get('courses/completed', [StudentCoursesController::class, 'completed']);
         Route::get('courses/remaining', [StudentCoursesController::class, 'remaining']);
         Route::get('courses/enrolled', [StudentCoursesController::class, 'enrolled']);
+
+        // AI Course Recommendations
+        Route::post('recommend', [StudentRecommendController::class, 'recommend']);
+        Route::get('recommend/status', [StudentRecommendController::class, 'status']);
     });
 });

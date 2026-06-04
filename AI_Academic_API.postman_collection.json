@@ -316,14 +316,20 @@
                   "mode": "formdata",
                   "formdata": [
                     {
-                      "key": "student_formula",
-                      "type": "file",
-                      "description": "Student data file — Excel or CSV (.xlsx, .xls, .csv)"
-                    },
-                    {
                       "key": "collage_list",
                       "type": "file",
                       "description": "College list file — PDF only (.pdf)"
+                    },
+                    {
+                      "key": "student_formula",
+                      "type": "file",
+                      "description": "Student data file — Excel (.xlsx, .xls)"
+                    },
+                    {
+                      "key": "term",
+                      "value": "Next Term",
+                      "type": "text",
+                      "description": "Target academic term (e.g. Fall 2025). Forwarded to the Python Advisor API."
                     }
                   ]
                 },
@@ -332,7 +338,7 @@
                   "host": ["{{base_url}}"],
                   "path": ["admin", "setup", "import"]
                 },
-                "description": "Upload the college catalog PDF and the student transcript XLSX.\n\nFiles are saved to disk and **AI processing is queued automatically**.\n\n**Form Data:**\n- `collage_list` *(required)* — College course list PDF (`.pdf`)\n- `student_formula` *(required)* — Student transcripts Excel file (`.xlsx`, `.xls`)\n\n**Response includes:**\n- File URLs\n- `processing_status: pending` — job is queued\n\n> 💡 Poll `GET /admin/setup/status` to track extraction progress."
+                "description": "Upload the college catalog PDF and the student transcript XLSX.\n\nFiles are saved to disk and **AI processing is queued automatically** (Laravel DB extraction + Python Advisor API setup run in parallel).\n\n**Form Data:**\n- `collage_list` *(required)* — College course list PDF (`.pdf`)\n- `student_formula` *(required)* — Student transcripts Excel file (`.xlsx`, `.xls`)\n- `term` *(optional)* — Target academic term string (e.g. `Fall 2025`). Defaults to `Next Term`.\n\n**What happens:**\n1. Files are stored on disk\n2. `StudentsImport` job queued → creates User records\n3. `ProcessSetupFilesJob` queued → Gemini extracts courses + student history\n4. Files forwarded to **Python Advisor API** → builds catalog summary for recommendations\n\n**Response includes:**\n- File URLs\n- `processing_status: pending` — job is queued\n\n> 💡 Poll `GET /admin/setup/status` for Laravel DB progress.\n> 💡 Poll `GET /admin/advisor/status` for Python recommendation engine progress."
               }
             },
             {
@@ -363,6 +369,21 @@
                   "path": ["admin", "setup", "status"]
                 },
                 "description": "Lightweight polling endpoint to check the AI processing status.\n\n**`processing_status` values:**\n- `pending` — queued, not started yet\n- `processing` — Gemini is currently extracting data\n- `completed` — all courses and student records are persisted ✅\n- `failed` — job failed; `processing_error` contains the reason ❌\n\n**On `completed`:** also returns `courses_count` — total courses in the DB."
+              }
+            },
+            {
+              "name": "🤖 Advisor API Status (Python)",
+              "request": {
+                "method": "GET",
+                "header": [
+                  { "key": "Accept", "value": "application/json" }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/admin/advisor/status",
+                  "host": ["{{base_url}}"],
+                  "path": ["admin", "advisor", "status"]
+                },
+                "description": "Check whether the **Python Advisor API** (FastAPI on port 8001) is ready to serve recommendations.\n\n**`advisor_status` values:**\n- `idle` — no setup has been run yet\n- `processing` — catalog summary is being built (Gemini upload in progress)\n- `ready` — setup complete, recommendations can be requested ✅\n- `error` — setup failed; check `error` field\n- `offline` — Python server is not running ❌\n\n> 💡 Students can only call `POST /student/recommend` once this returns `ready`."
               }
             }
           ]
@@ -501,6 +522,48 @@
                   "path": ["student", "courses", "remaining"]
                 },
                 "description": "Returns all courses the student has **never enrolled in** — neither passed nor currently registered.\n\nUseful for showing what courses are still available to register."
+              }
+            }
+          ]
+        },
+        {
+          "name": "🤖 AI Recommendations",
+          "description": "Gemini-powered course recommendations for the authenticated student.\n\n> ⚠️ Requires the Python Advisor API to be `ready`. Check `GET /student/recommend/status` before calling.",
+          "item": [
+            {
+              "name": "🎯 Get My Recommendations",
+              "request": {
+                "method": "POST",
+                "header": [
+                  { "key": "Accept", "value": "application/json" },
+                  { "key": "Content-Type", "value": "application/json" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"term\": \"Next Term\"\n}",
+                  "options": { "raw": { "language": "json" } }
+                },
+                "url": {
+                  "raw": "{{base_url}}/student/recommend",
+                  "host": ["{{base_url}}"],
+                  "path": ["student", "recommend"]
+                },
+                "description": "Request AI-powered course recommendations for the authenticated student.\n\nThe student's code is taken from their authentication token — no need to pass it manually.\n\n**Body (JSON, optional):**\n```json\n{\n  \"term\": \"Next Term\"  // optional — defaults to 'Next Term'\n}\n```\n\n**Response `data` object:**\n```json\n{\n  \"student_code\": \"2021001\",\n  \"student_label\": \"Ahmed Mohamed (ID: 2021001)\",\n  \"sheet\": \"Sheet1\",\n  \"term\": \"Next Term\",\n  \"recommended_courses\": [\n    {\n      \"course_code\": \"CS401\",\n      \"course_title\": \"Software Engineering\",\n      \"course_title_in_arabic\": \"هندسة البرمجيات\",\n      \"credits\": 3,\n      \"justification\": \"Prerequisites satisfied: CS301, CS302\",\n      \"catalog_availability_proof\": \"Semester 7 — Offered in Fall\"\n    }\n  ]\n}\n```\n\n**Error cases:**\n- `503` — Advisor not ready; run `POST /admin/setup/import` first\n- `404` — Student not found in advisor data\n- `500` — Gemini recommendation engine error\n\n> ⏳ This call may take **30–90 seconds** (Gemini chain-of-thought processing)."
+              }
+            },
+            {
+              "name": "📡 Advisor Readiness Status",
+              "request": {
+                "method": "GET",
+                "header": [
+                  { "key": "Accept", "value": "application/json" }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/student/recommend/status",
+                  "host": ["{{base_url}}"],
+                  "path": ["student", "recommend", "status"]
+                },
+                "description": "Check if the Python Advisor API is ready to serve recommendations.\n\n**`advisor_status` values:**\n- `idle` — no setup run yet\n- `processing` — building catalog summary\n- `ready` — ready to recommend ✅\n- `error` — setup failed\n- `offline` — Python server is down ❌\n\n> 💡 Poll this before showing the recommendations button in your frontend."
               }
             }
           ]

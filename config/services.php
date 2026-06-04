@@ -39,4 +39,8 @@ return [
         'key' => env('GEMINI_API_KEY'),
     ],
 
+    'advisor_api' => [
+        'url' => env('ADVISOR_API_URL', 'http://127.0.0.1:8001'),
+    ],
+
 ];

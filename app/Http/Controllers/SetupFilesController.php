@@ -6,11 +6,14 @@ use App\Imports\StudentsImport;
 use App\Jobs\ProcessSetupFilesJob;
 use App\Models\Course;
 use App\Models\SetupFile;
+use App\Services\AdvisorApiService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 
 class SetupFilesController extends Controller
 {
+    public function __construct(private readonly AdvisorApiService $advisor) {}
     // ══════════════════════════════════════════════════════════════════════════
     //  GET /admin/setup/files
     // ══════════════════════════════════════════════════════════════════════════
@@ -96,6 +99,26 @@ class SetupFilesController extends Controller
         // ── Queue student import → triggers ProcessSetupFilesJob on finish ──
         (new StudentsImport($setupFile->id))->queue($request->file('student_formula'));
 
+        // ── Forward files to Python Advisor API (fire-and-forget) ──────────
+        // We pass the absolute disk paths; errors are logged but never block the response.
+        $pdfAbsPath   = Storage::disk('public')->path($newPdfPath);
+        $excelAbsPath = Storage::disk('public')->path($newExcelPath);
+        $term         = $request->input('term', 'Next Term');
+
+        try {
+            if ($this->advisor->isAlive()) {
+                $this->advisor->sendSetup($pdfAbsPath, $excelAbsPath, $term);
+                Log::info('SetupFilesController: advisor API setup triggered successfully.');
+            } else {
+                Log::warning('SetupFilesController: advisor API is offline, skipping forwarding.');
+            }
+        } catch (\Throwable $e) {
+            // Non-fatal — Laravel processing continues independently
+            Log::error('SetupFilesController: could not forward files to advisor API', [
+                'error' => $e->getMessage(),
+            ]);
+        }
+
         return $this->success(
             $setupFile->fresh(),
             'Files uploaded. Students are being imported — call /status to check processing once done.'
@@ -141,6 +164,20 @@ class SetupFilesController extends Controller
         ]);
 
         ProcessSetupFilesJob::dispatch($setupFile->id);
+
+        // ── Also re-trigger the Python advisor API setup ─────────────────
+        $pdfAbsPath   = Storage::disk('public')->path($setupFile->getRawOriginal('collage_list'));
+        $excelAbsPath = Storage::disk('public')->path($setupFile->getRawOriginal('student_formula'));
+        $term         = $request->input('term', 'Next Term');
+
+        try {
+            if ($this->advisor->isAlive()) {
+                $this->advisor->sendSetup($pdfAbsPath, $excelAbsPath, $term);
+                Log::info('SetupFilesController: advisor API re-setup triggered.');
+            }
+        } catch (\Throwable $e) {
+            Log::error('SetupFilesController: advisor API re-setup failed', ['error' => $e->getMessage()]);
+        }
 
         return $this->success(
             $setupFile->fresh(),

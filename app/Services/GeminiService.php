@@ -25,7 +25,7 @@ class GeminiService
     // ── Constants ──────────────────────────────────────────────────────────────
 
     private const API_BASE   = 'https://generativelanguage.googleapis.com/v1beta/models';
-    private const MODEL      = 'gemini-2.5-flash';
+    private const MODEL      = 'gemini-3.5-flash';
     private const MAX_TOKENS = 32768; // large enough for 100+ courses in JSON
 
     // Max characters of extracted text to send (to stay within context window)
