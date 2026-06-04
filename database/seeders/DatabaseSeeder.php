@@ -18,7 +18,7 @@ class DatabaseSeeder extends Seeder
     {
         // User::factory(10)->create();
 
-        User::factory()->create([
+        User::Create([
             'name' => 'admin',
             'code' => 'admin',
             'national_id' => '00000000000000',
