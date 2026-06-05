@@ -61,25 +61,25 @@ class MaterialRequestController extends Controller
             }
 
             // 3. Check prerequisite
-            if (!empty($course->prerequisite)) {
-                $prereqCode = trim($course->prerequisite);
-                $prereqCourse = Course::where('code', $prereqCode)->first();
+            // if (!empty($course->prerequisite)) {
+            //     $prereqCode = trim($course->prerequisite);
+            //     $prereqCourse = Course::where('code', $prereqCode)->first();
                 
-                if ($prereqCourse) {
-                    $passedPrereq = \App\Models\StudentCourses::where('student_id', $student->id)
-                        ->where('course_id', $prereqCourse->id)
-                        ->where('is_passed', true)
-                        ->exists();
+            //     if ($prereqCourse) {
+            //         $passedPrereq = \App\Models\StudentCourses::where('student_id', $student->id)
+            //             ->where('course_id', $prereqCourse->id)
+            //             ->where('is_passed', true)
+            //             ->exists();
 
-                    if (!$passedPrereq) {
-                        $skipped[] = [
-                            'course_id' => $courseId,
-                            'reason'    => "You must pass the prerequisite course ({$prereqCourse->name}) first.",
-                        ];
-                        continue;
-                    }
-                }
-            }
+            //         if (!$passedPrereq) {
+            //             $skipped[] = [
+            //                 'course_id' => $courseId,
+            //                 'reason'    => "You must pass the prerequisite course ({$prereqCourse->name}) first.",
+            //             ];
+            //             continue;
+            //         }
+            //     }
+            // }
 
             $created[] = MaterialRequest::create([
                 'student_id'     => $student->id,
