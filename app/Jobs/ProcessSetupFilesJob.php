@@ -262,17 +262,20 @@ class ProcessSetupFilesJob implements ShouldQueue
                 }
 
                 // Use model updateOrCreate to handle duplicates safely
-                StudentCourses::updateOrCreate(
-                    [
-                        'student_id' => $student->id,
-                        'course_id'  => $courseId,
-                    ],
-                    [
-                        'is_passed' => $isPassed,
-                    ]
-                );
+                if($isPassed){
+                    StudentCourses::updateOrCreate(
+                        [
+                            'student_id' => $student->id,
+                            'course_id'  => $courseId,
+                        ],
+                        [
+                            'is_passed' => $isPassed,
+                        ]
+                    );
+                    
+                    $savedCount++;
+                }
 
-                $savedCount++;
             }
 
             Log::info('ProcessSetupFilesJob: student courses saved', [
