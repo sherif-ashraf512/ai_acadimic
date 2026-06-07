@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\MaterialRequest;
+use App\Models\StudentCourses;
 use Illuminate\Http\Request;
 
 class AdminMaterialRequestController extends Controller
@@ -84,16 +85,24 @@ class AdminMaterialRequestController extends Controller
             'ids.*' => 'required|integer|exists:material_requests,id',
         ]);
 
-        $updated = MaterialRequest::whereIn('id', $request->ids)
+        $approvedRequests = MaterialRequest::whereIn('id', $request->ids)
             ->where('status', 'pending')
             ->update([
                 'status'        => 'approved',
                 'adviser_notes' => null,
             ]);
 
+        foreach ($approvedRequests as $request) {
+            StudentCourses::where('student_id', $request->student_id)
+                ->where('course_id', $request->course_id)
+                ->update([
+                    'is_passed' => 0,
+                ]);
+        }
+
         return $this->success(
-            ['updated_count' => $updated],
-            "Approved {$updated} request(s) successfully."
+            ['updated_count' => $approvedRequests->count()],
+            "Approved {$approvedRequests->count()} request(s) successfully."
         );
     }
 
