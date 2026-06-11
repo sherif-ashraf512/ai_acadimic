@@ -100,8 +100,8 @@ class AdvisorApiService
             'term'         => $term,
         ]);
 
-        // Gemini chain-of-thought takes ~30-90 seconds per student — set a generous timeout
-        $response = Http::timeout(180)->post("{$this->baseUrl}/student/recommend", [
+        // Gemini 4-step chain-of-thought takes ~60-180 seconds per student — set a generous timeout
+        $response = Http::timeout(300)->post("{$this->baseUrl}/student/recommend", [
             'student_code' => $studentCode,
             'term'         => $term,
         ]);

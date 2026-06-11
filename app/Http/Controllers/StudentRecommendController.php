@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Course;
 use App\Models\User;
 use App\Services\AdvisorApiService;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 
@@ -60,6 +61,16 @@ class StudentRecommendController extends Controller
 
         try {
             $data = $this->advisor->recommend($user->code, $term);
+        } catch (ConnectionException $e) {
+            Log::warning('StudentRecommendController: advisor request timed out', [
+                'student_code' => $user->code,
+                'error'        => $e->getMessage(),
+            ]);
+
+            return $this->error(
+                'The recommendation service is taking too long. Please try again in a moment.',
+                504
+            );
         } catch (\RuntimeException $e) {
             Log::warning('StudentRecommendController: recommend failed', [
                 'student_code' => $user->code,
