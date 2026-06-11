@@ -100,31 +100,77 @@ class AdvisorApiService
             'term'         => $term,
         ]);
 
-        // Gemini 4-step chain-of-thought takes ~60-180 seconds per student — set a generous timeout
-        $response = Http::timeout(300)->post("{$this->baseUrl}/student/recommend", [
+        // ── Step 1: Start async task ────────────────────────────────────────
+        $startResponse = Http::timeout(30)->post("{$this->baseUrl}/student/recommend", [
             'student_code' => $studentCode,
             'term'         => $term,
         ]);
 
-        if ($response->status() === 404) {
+        if ($startResponse->status() === 404) {
             throw new \RuntimeException("Student '{$studentCode}' not found in advisor data.");
         }
 
-        if ($response->status() === 503) {
-            $msg = $response->json('detail.message') ?? 'Advisor not ready.';
+        if ($startResponse->status() === 503) {
+            $msg = $startResponse->json('detail.message') ?? 'Advisor not ready.';
             throw new \RuntimeException($msg);
         }
 
-        if ($response->failed()) {
-            $msg = $response->json('detail.message') ?? $response->body();
-            Log::error('AdvisorApiService: recommend failed', [
+        if ($startResponse->failed()) {
+            $msg = $startResponse->json('detail.message') ?? $startResponse->body();
+            Log::error('AdvisorApiService: recommend start failed', [
                 'student_code' => $studentCode,
                 'response'     => $msg,
             ]);
             throw new \RuntimeException("Recommendation failed: {$msg}");
         }
 
-        return $response->json('data', []);
+        $taskId = $startResponse->json('data.task_id');
+        if (!$taskId) {
+            throw new \RuntimeException('Advisor API did not return a task_id.');
+        }
+
+        Log::info("AdvisorApiService: task started", ['task_id' => $taskId]);
+
+        // ── Step 2: Poll for result ─────────────────────────────────────────
+        $maxPolls    = 60;       // 60 × 5s = 5 minutes max
+        $pollDelay   = 5;        // seconds between polls
+
+        for ($i = 0; $i < $maxPolls; $i++) {
+            sleep($pollDelay);
+
+            $pollResponse = Http::timeout(15)
+                ->get("{$this->baseUrl}/student/recommend/status/{$taskId}");
+
+            if ($pollResponse->failed()) {
+                $msg = $pollResponse->json('detail.message') ?? $pollResponse->body();
+
+                // 500 = task failed with error
+                if ($pollResponse->status() === 500) {
+                    throw new \RuntimeException("Recommendation failed: {$msg}");
+                }
+
+                // 404 = task not found (shouldn't happen)
+                if ($pollResponse->status() === 404) {
+                    throw new \RuntimeException("Recommendation task lost. Please retry.");
+                }
+
+                Log::warning('AdvisorApiService: poll error', ['response' => $msg]);
+                continue;
+            }
+
+            $status = $pollResponse->json('data.status', 'processing');
+
+            if ($status === 'processing') {
+                continue;  // still working, poll again
+            }
+
+            // Done — return the result
+            return $pollResponse->json('data', []);
+        }
+
+        throw new \RuntimeException(
+            "Recommendation timed out after " . ($maxPolls * $pollDelay) . " seconds. Please try again."
+        );
     }
 
     // ══════════════════════════════════════════════════════════════════════════
