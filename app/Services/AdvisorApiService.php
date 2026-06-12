@@ -158,14 +158,20 @@ class AdvisorApiService
                 continue;
             }
 
-            $status = $pollResponse->json('data.status', 'processing');
+            $data   = $pollResponse->json('data', []);
+            $status = $data['status'] ?? null;
 
-            if ($status === 'processing') {
+            // Task is done if status says so, or if results are already present
+            if ($status === 'done' || isset($data['recommended_courses'])) {
+                return $data;
+            }
+
+            if ($status === 'processing' || $status === null) {
                 continue;  // still working, poll again
             }
 
-            // Done — return the result
-            return $pollResponse->json('data', []);
+            // Unknown status — treat as done
+            return $data;
         }
 
         throw new \RuntimeException(
